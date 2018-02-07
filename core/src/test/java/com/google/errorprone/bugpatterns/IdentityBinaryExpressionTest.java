@@ -157,28 +157,28 @@ public class IdentityBinaryExpressionTest {
   }
 
   @Test
-  public void isNaN() {
+  public void isNan() {
     compilationHelper
         .addSourceLines(
             "Test.java",
             "class Test {",
             "  boolean f(float a, Float b, double c, Double d) {",
             "    boolean r = false;",
-            "    // BUG: Diagnostic contains: equivalent to `Float.isNaN(a)`",
+            "    // BUG: Diagnostic contains: equivalent to `Float.isNan(a)`",
             "    r |= a == a;",
-            "    // BUG: Diagnostic contains: equivalent to `!Float.isNaN(a)`",
+            "    // BUG: Diagnostic contains: equivalent to `!Float.isNan(a)`",
             "    r |= a != a;",
-            "    // BUG: Diagnostic contains: equivalent to `Float.isNaN(b)`",
+            "    // BUG: Diagnostic contains: equivalent to `Float.isNan(b)`",
             "    r |= b == b;",
-            "    // BUG: Diagnostic contains: equivalent to `!Float.isNaN(b)`",
+            "    // BUG: Diagnostic contains: equivalent to `!Float.isNan(b)`",
             "    r |= b != b;",
-            "    // BUG: Diagnostic contains: equivalent to `Double.isNaN(c)`",
+            "    // BUG: Diagnostic contains: equivalent to `Double.isNan(c)`",
             "    r |= c == c;",
-            "    // BUG: Diagnostic contains: equivalent to `!Double.isNaN(c)`",
+            "    // BUG: Diagnostic contains: equivalent to `!Double.isNan(c)`",
             "    r |= c != c;",
-            "    // BUG: Diagnostic contains: equivalent to `Double.isNaN(d)`",
+            "    // BUG: Diagnostic contains: equivalent to `Double.isNan(d)`",
             "    r |= d == d;",
-            "    // BUG: Diagnostic contains: equivalent to `!Double.isNaN(d)`",
+            "    // BUG: Diagnostic contains: equivalent to `!Double.isNan(d)`",
             "    r |= d != d;",
             "    return r;",
             "  }",

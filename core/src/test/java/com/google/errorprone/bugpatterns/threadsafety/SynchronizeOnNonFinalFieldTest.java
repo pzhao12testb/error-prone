@@ -112,18 +112,4 @@ public class SynchronizeOnNonFinalFieldTest {
             "}")
         .doTest();
   }
-
-  @Test
-  public void negative_Writer() throws Exception {
-    compilationHelper
-        .addSourceLines(
-            "Test.java",
-            "import java.io.Writer;",
-            "abstract class Test extends Writer {",
-            "  void m() {",
-            "    synchronized (lock) {}",
-            "  }",
-            "}")
-        .doTest();
-  }
 }

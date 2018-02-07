@@ -70,7 +70,7 @@ public class PredicateIncompatibleTypeTest {
             "import java.util.stream.Stream;",
             "class Test {",
             "  Stream<ArrayList<String>> f(List<ArrayList<String>> a, LinkedList<String> b) {",
-            "    return a.stream().filter(b::equals);",
+            "    return a.stream().filter(a::equals);",
             "  }",
             "}")
         .doTest();

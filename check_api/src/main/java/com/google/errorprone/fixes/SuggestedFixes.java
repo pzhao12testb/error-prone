@@ -450,18 +450,6 @@ public class SuggestedFixes {
    * Returns a fix that adds a {@code @SuppressWarnings(warningToSuppress)} to the closest
    * suppressible element to the node pointed at by {@code state.getPath()}.
    *
-   * @see #addSuppressWarnings(VisitorState, String, String)
-   */
-  @Nullable
-  public static Fix addSuppressWarnings(VisitorState state, String warningToSuppress) {
-    return addSuppressWarnings(state, warningToSuppress, null);
-  }
-
-  /**
-   * Returns a fix that adds a {@code @SuppressWarnings(warningToSuppress)} to the closest
-   * suppressible element to the node pointed at by {@code state.getPath()}, optionally suffixing
-   * the suppression with a comment suffix (e.g. a reason for the suppression).
-   *
    * <p>If the closest suppressible element already has a @SuppressWarning annotation,
    * warningToSuppress will be added to the value in {@code @SuppressWarnings} instead.
    *
@@ -471,10 +459,9 @@ public class SuggestedFixes {
    * warningToSuppress}, this method will return null.
    */
   @Nullable
-  public static Fix addSuppressWarnings(
-      VisitorState state, String warningToSuppress, @Nullable String lineComment) {
+  public static Fix addSuppressWarnings(VisitorState state, String warningToSuppress) {
     Builder fixBuilder = SuggestedFix.builder();
-    addSuppressWarnings(fixBuilder, state, warningToSuppress, lineComment);
+    addSuppressWarnings(fixBuilder, state, warningToSuppress);
     return fixBuilder.isEmpty() ? null : fixBuilder.build();
   }
 
@@ -483,31 +470,10 @@ public class SuggestedFixes {
    * closest suppressible node, or add {@code warningToSuppress} to that node if there's already a
    * {@code SuppressWarnings} annotation there.
    *
-   * @see #addSuppressWarnings(VisitorState, String, String)
+   * @see #addSuppressWarnings(VisitorState, String)
    */
   public static void addSuppressWarnings(
       Builder fixBuilder, VisitorState state, String warningToSuppress) {
-    addSuppressWarnings(fixBuilder, state, warningToSuppress, null);
-  }
-
-  /**
-   * Modifies {@code fixBuilder} to either create a new {@code @SuppressWarnings} element on the
-   * closest suppressible node, or add {@code warningToSuppress} to that node if there's already a
-   * {@code SuppressWarnings} annotation there.
-   *
-   * @param fixBuilder
-   * @param state
-   * @param warningToSuppress the warning to be suppressed, without the surrounding annotation. For
-   *     example, to produce {@code @SuppressWarnings("Foo")}, pass {@code Foo}.
-   * @param lineComment if non-null, the {@code @SuppressWarnings} will be prefixed by a line
-   *     comment containing this text. Do not pass leading {@code //} or include any line breaks.
-   * @see #addSuppressWarnings(VisitorState, String, String)
-   */
-  public static void addSuppressWarnings(
-      Builder fixBuilder,
-      VisitorState state,
-      String warningToSuppress,
-      @Nullable String lineComment) {
     // Find the nearest tree to add @SuppressWarnings to.
     Tree suppressibleNode = suppressibleNode(state.getPath());
     if (suppressibleNode == null) {
@@ -515,12 +481,6 @@ public class SuggestedFixes {
     }
 
     SuppressWarnings existingAnnotation = getAnnotation(suppressibleNode, SuppressWarnings.class);
-    String suppression = state.getTreeMaker().Literal(CLASS, warningToSuppress).toString();
-
-    // Line comment to add, if it is present.
-    Optional<String> formattedLineComment =
-        Optional.ofNullable(lineComment).map(s -> "// " + s + "\n");
-
     // If we have an existing @SuppressWarnings on the element, extend its value
     if (existingAnnotation != null) {
       // Add warning to the existing annotation
@@ -539,14 +499,13 @@ public class SuggestedFixes {
 
       fixBuilder.merge(
           addValuesToAnnotationArgument(
-              suppressAnnotationTree, "value", ImmutableList.of(suppression), state));
-      formattedLineComment.ifPresent(lc -> fixBuilder.prefixWith(suppressAnnotationTree, lc));
+              suppressAnnotationTree,
+              "value",
+              ImmutableList.of(state.getTreeMaker().Literal(CLASS, warningToSuppress).toString()),
+              state));
     } else {
       // Otherwise, add a suppress annotation to the element
-      String replacement =
-          formattedLineComment.orElse("") + "@SuppressWarnings(" + suppression + ") ";
-
-      fixBuilder.prefixWith(suppressibleNode, replacement);
+      fixBuilder.prefixWith(suppressibleNode, "@SuppressWarnings(\"" + warningToSuppress + "\")\n");
     }
   }
 

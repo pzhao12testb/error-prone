@@ -38,7 +38,6 @@ import com.sun.source.tree.ClassTree;
 import com.sun.source.tree.CompoundAssignmentTree;
 import com.sun.source.tree.ExpressionTree;
 import com.sun.source.tree.IdentifierTree;
-import com.sun.source.tree.LambdaExpressionTree;
 import com.sun.source.tree.MemberReferenceTree;
 import com.sun.source.tree.MemberSelectTree;
 import com.sun.source.tree.MethodInvocationTree;
@@ -74,7 +73,6 @@ import com.sun.tools.javac.code.Types;
 import com.sun.tools.javac.comp.Enter;
 import com.sun.tools.javac.comp.Resolve;
 import com.sun.tools.javac.tree.JCTree;
-import com.sun.tools.javac.tree.JCTree.JCAnnotatedType;
 import com.sun.tools.javac.tree.JCTree.JCClassDecl;
 import com.sun.tools.javac.tree.JCTree.JCFieldAccess;
 import com.sun.tools.javac.tree.JCTree.JCIdent;
@@ -206,9 +204,6 @@ public class ASTHelpers {
     }
     if (tree instanceof MemberReferenceTree) {
       return ((JCMemberReference) tree).sym;
-    }
-    if (tree instanceof JCAnnotatedType) {
-      return getSymbol(((JCAnnotatedType) tree).underlyingType);
     }
 
     return getDeclaredSymbol(tree);
@@ -1056,27 +1051,8 @@ public class ASTHelpers {
           }
 
           @Override
-          public Type visitLambdaExpression(
-              LambdaExpressionTree lambdaExpressionTree, Void unused) {
-            return state
-                .getTypes()
-                .findDescriptorType(getType(lambdaExpressionTree))
-                .getReturnType();
-          }
-
-          @Override
           public Type visitReturn(ReturnTree node, Void unused) {
-            for (TreePath path = parent; path != null; path = path.getParentPath()) {
-              Tree enclosing = path.getLeaf();
-              switch (enclosing.getKind()) {
-                case METHOD:
-                  return getType(((MethodTree) enclosing).getReturnType());
-                case LAMBDA_EXPRESSION:
-                  return visitLambdaExpression((LambdaExpressionTree) enclosing, null);
-                default: // fall out
-              }
-            }
-            throw new AssertionError("return not enclosed by method or lambda");
+            return getType(findEnclosingNode(parent, MethodTree.class).getReturnType());
           }
 
           @Override

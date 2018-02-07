@@ -23,7 +23,6 @@ import com.google.errorprone.BugCheckerRefactoringTestHelper;
 import com.google.errorprone.BugPattern;
 import com.google.errorprone.CompilationTestHelper;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -180,47 +179,6 @@ public final class UngroupedOverloadsTest {
             "  void bar() {}",
             "  void foo(int x) {}",
             "  void baz() {}",
-            "}")
-        .doTest();
-  }
-
-  @Ignore // TODO(b/71818169): fix and re-enable
-  @Test
-  public void staticAndNonStatic() throws Exception {
-    refactoringHelper
-        .addInputLines(
-            "Test.java",
-            "class Test {",
-            "  void foo() {}",
-            "  void bar() {}",
-            "  static void foo(int x) {}",
-            "}")
-        .expectUnchanged()
-        .doTest();
-  }
-
-  @Test
-  public void staticAndNonStaticInterspersed() throws Exception {
-    cutoffCompilationHelper
-        .addSourceLines(
-            "Test.java",
-            "class Test {",
-            "  private void foo(int x) {}",
-            "  private static void foo(int x, int y, int z) {}",
-            "  private void foo(int x, int y) {}",
-            "}")
-        .doTest();
-  }
-
-  @Test
-  public void suppressOnAnyMethod() throws Exception {
-    compilationHelper
-        .addSourceLines(
-            "Test.java",
-            "class Test {",
-            "  void foo() {}",
-            "  void bar() {}",
-            "  @SuppressWarnings(\"UngroupedOverloads\") void foo(int x) {}",
             "}")
         .doTest();
   }

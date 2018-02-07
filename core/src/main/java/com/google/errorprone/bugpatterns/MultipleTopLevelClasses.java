@@ -16,7 +16,6 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.common.base.MoreObjects.firstNonNull;
 import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.LinkType.CUSTOM;
 import static com.google.errorprone.BugPattern.SeverityLevel.SUGGESTION;
@@ -54,7 +53,10 @@ public class MultipleTopLevelClasses extends BugChecker implements CompilationUn
       // else should have exactly one.
       return Description.NO_MATCH;
     }
-
+    if (tree.getPackageName() == null) {
+      // Real code doesn't use the default package.
+      return Description.NO_MATCH;
+    }
     List<String> names = new ArrayList<>();
     for (Tree member : tree.getTypeDecls()) {
       if (member instanceof ClassTree) {
@@ -87,8 +89,6 @@ public class MultipleTopLevelClasses extends BugChecker implements CompilationUn
         String.format(
             "Expected at most one top-level class declaration, instead found: %s",
             Joiner.on(", ").join(names));
-    return buildDescription(firstNonNull(tree.getPackageName(), tree.getTypeDecls().get(0)))
-        .setMessage(message)
-        .build();
+    return buildDescription(tree.getPackageName()).setMessage(message).build();
   }
 }

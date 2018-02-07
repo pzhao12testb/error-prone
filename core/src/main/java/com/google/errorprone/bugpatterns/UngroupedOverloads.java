@@ -22,7 +22,6 @@ import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.LinkType.CUSTOM;
 import static com.google.errorprone.BugPattern.SeverityLevel.SUGGESTION;
 
-import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -31,11 +30,10 @@ import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.ClassTreeMatcher;
 import com.google.errorprone.fixes.SuggestedFix;
 import com.google.errorprone.matchers.Description;
-import com.google.errorprone.util.ASTHelpers;
 import com.sun.source.tree.ClassTree;
 import com.sun.source.tree.MethodTree;
 import com.sun.source.tree.Tree;
-import com.sun.tools.javac.code.Symbol.MethodSymbol;
+import com.sun.source.tree.VariableTree;
 import com.sun.tools.javac.tree.JCTree;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -133,14 +131,15 @@ public class UngroupedOverloads extends BugChecker implements ClassTreeMatcher {
      * probably be much more complicated and the constant would be much greater (so for sane code
      * it would be slower).
      */
-    Map<OverloadKey, Integer> previousOccurrences = new LinkedHashMap<>();
+    Map<Name, Integer> previousOccurrences = new LinkedHashMap<>();
     for (int currentOccurrence = 0; currentOccurrence < classMembers.size(); currentOccurrence++) {
       Tree memberTree = classMembers.get(currentOccurrence);
       if (!(memberTree instanceof MethodTree)) {
         continue;
       }
 
-      OverloadKey methodName = OverloadKey.create((MethodTree) memberTree);
+      MethodTree methodTree = (MethodTree) memberTree;
+      Name methodName = methodTree.getName();
 
       Integer previousOccurrence = previousOccurrences.get(methodName);
       if (previousOccurrence != null) {
@@ -149,15 +148,12 @@ public class UngroupedOverloads extends BugChecker implements ClassTreeMatcher {
           // We "bubble" the current occurrence until it is placed next to the previous occurrence.
           for (int i = currentOccurrence - 1; i > previousOccurrence; i--) {
             Tree splitterTree = classMembers.get(i);
-            if (!(splitterTree instanceof MethodTree)) {
-              continue;
-            }
-            OverloadKey splitterKey = OverloadKey.create((MethodTree) splitterTree);
+            Name splitterName = getMemberName(splitterTree);
 
             // Swapping may invalidate `previousOccurrences` so we need to shift it by one manually.
-            Integer splitterOccurrence = previousOccurrences.get(splitterKey);
+            Integer splitterOccurrence = previousOccurrences.get(splitterName);
             if (splitterOccurrence != null && splitterOccurrence.equals(i)) {
-              previousOccurrences.put(splitterKey, i + 1);
+              previousOccurrences.put(splitterName, i + 1);
             }
 
             Collections.swap(classMembers, i, i + 1);
@@ -169,6 +165,27 @@ public class UngroupedOverloads extends BugChecker implements ClassTreeMatcher {
         previousOccurrences.put(methodName, currentOccurrence);
       }
     }
+  }
+
+  /**
+   * Returns a name for given {@code memberTree} declaration.
+   *
+   * <p>Unfortunately there is no specific {@code MemberTree} class and {@link
+   * ClassTree#getMembers()} returns a list of {@link Tree} elements. But we know that the only
+   * valid member declarations are either inner classes, methods or variables and they are all
+   * named.
+   */
+  private static Name getMemberName(Tree memberTree) {
+    if (memberTree instanceof ClassTree) {
+      return ((ClassTree) memberTree).getSimpleName();
+    }
+    if (memberTree instanceof MethodTree) {
+      return ((MethodTree) memberTree).getName();
+    }
+    if (memberTree instanceof VariableTree) {
+      return ((VariableTree) memberTree).getName();
+    }
+    throw new AssertionError("expected member tree instead of " + memberTree.getKind());
   }
 
   /**
@@ -246,21 +263,6 @@ public class UngroupedOverloads extends BugChecker implements ClassTreeMatcher {
     return -1;
   }
 
-  @AutoValue
-  abstract static class OverloadKey {
-    abstract String name();
-
-    // TODO(cushon): re-enable this, but don't warn about interspersed static/non-static overloads
-    // Include static-ness when grouping overloads. Static and non-static methods are still
-    // overloads per the JLS, but are less interesting in practice.
-    // abstract boolean isStatic();
-
-    public static OverloadKey create(MethodTree methodTree) {
-      MethodSymbol sym = ASTHelpers.getSymbol(methodTree);
-      return new AutoValue_UngroupedOverloads_OverloadKey(sym.getSimpleName().toString());
-    }
-  }
-
   private interface OverloadViolation {
     Name getMethodName();
 
@@ -319,7 +321,6 @@ public class UngroupedOverloads extends BugChecker implements ClassTreeMatcher {
     private final ImmutableList<? extends Tree> classMembers; // Initial, unchanged members.
     private final VisitorState state;
     private final List<OverloadViolation> violations;
-    private final ImmutableSet<String> suppressed;
 
     public MethodFixSuggester(
         ClassTree classTree, List<? extends Tree> classMembers, VisitorState state) {
@@ -327,24 +328,10 @@ public class UngroupedOverloads extends BugChecker implements ClassTreeMatcher {
       this.classMembers = ImmutableList.copyOf(classMembers);
       this.state = state;
       this.violations = new ArrayList<>();
-      this.suppressed =
-          classMembers
-              .stream()
-              .filter(MethodTree.class::isInstance)
-              .map(MethodTree.class::cast)
-              .filter(m -> isSuppressed(m))
-              .map(m -> m.getName().toString())
-              .collect(toImmutableSet());
-    }
-
-    private void addViolation(OverloadViolation violation) {
-      if (!suppressed.contains(violation.getMethodName().toString())) {
-        violations.add(violation);
-      }
     }
 
     public void justReport(int currentOccurrence) {
-      addViolation(new JustReport((MethodTree) classMembers.get(currentOccurrence)));
+      violations.add(new JustReport((MethodTree) classMembers.get(currentOccurrence)));
     }
 
     public void moveBlock(int currentOccurrence) {
@@ -361,7 +348,7 @@ public class UngroupedOverloads extends BugChecker implements ClassTreeMatcher {
 
       int startPosition = getBroadStartPosition(state, currentTree, previousTree);
       int endPosition = getBroadEndPosition(state, currentTree, nextTree);
-      addViolation(new MoveBlock(currentName, startPosition, endPosition));
+      violations.add(new MoveBlock(currentName, startPosition, endPosition));
     }
 
     public Description describeFix() {
@@ -396,7 +383,7 @@ public class UngroupedOverloads extends BugChecker implements ClassTreeMatcher {
 
     private Description.Builder buildMethodDescription(Name methodName) {
       MethodTree methodTree = getFirstOccurrences().get(methodName);
-      return buildDescription(methodTree).setMessage(getMethodFixMessage(methodTree));
+      return buildDescription(methodTree).setMessage(getMethodFixMessage());
     }
 
     private Description.Builder buildClassDescription(Collection<Name> methodNames) {
@@ -471,8 +458,8 @@ public class UngroupedOverloads extends BugChecker implements ClassTreeMatcher {
         .collect(toImmutableMap(Map.Entry::getKey, entry -> mapper.apply(entry.getValue())));
   }
 
-  private static String getMethodFixMessage(MethodTree methodTree) {
-    return String.format("Overloads of '%s' are not grouped together", methodTree.getName());
+  private static String getMethodFixMessage() {
+    return "Overloaded versions of this method are not grouped together";
   }
 
   private static String getClassFixMessage(Collection<Name> methodNames) {

@@ -509,20 +509,4 @@ public class JUnit4TestNotRunTest {
         .addSourceFile("JUnit4TestNotRunNegativeCase5.java")
         .doTest();
   }
-
-  @Test
-  public void junit3TestWithIgnore() {
-    compilationHelper
-        .addSourceLines(
-            "TestStuff.java",
-            "import org.junit.Ignore;",
-            "import org.junit.runner.RunWith;",
-            "import org.junit.runners.JUnit4;",
-            "@RunWith(JUnit4.class)",
-            "public class TestStuff {",
-            "  @Ignore",
-            "  public void testMethod() {}",
-            "}")
-        .doTest();
-  }
 }

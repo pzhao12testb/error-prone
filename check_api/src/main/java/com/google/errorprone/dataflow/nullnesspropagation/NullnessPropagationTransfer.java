@@ -163,8 +163,7 @@ class NullnessPropagationTransfer extends AbstractNullnessPropagationTransfer
             BigInteger.class.getName(),
             BigDecimal.class.getName(),
             UnsignedInteger.class.getName(),
-            UnsignedLong.class.getName(),
-            Objects.class.getName());
+            UnsignedLong.class.getName());
 
     private static final ImmutableSet<String> CLASSES_WITH_NON_NULLABLE_VALUE_OF_METHODS =
         ImmutableSet.of(
@@ -496,7 +495,7 @@ class NullnessPropagationTransfer extends AbstractNullnessPropagationTransfer
     ClassAndMethod callee = tryGetMethodSymbol(node.getTree(), Types.instance(context));
     setReceiverNonnull(bothUpdates, node.getTarget().getReceiver(), callee);
     setUnconditionalArgumentNullness(bothUpdates, node.getArguments(), callee);
-    setConditionalArgumentNullness(thenUpdates, elseUpdates, node.getArguments(), callee);
+    setConditionalArgumentNullness(elseUpdates, node.getArguments(), callee);
     return returnValueNullness(callee);
   }
 
@@ -741,23 +740,9 @@ class NullnessPropagationTransfer extends AbstractNullnessPropagationTransfer
    * Strings.isNullOrEmpty(s)} returns {@code false}, then {@code s} is not null.
    */
   private static void setConditionalArgumentNullness(
-      LocalVariableUpdates thenUpdates,
-      LocalVariableUpdates elseUpdates,
-      List<Node> arguments,
-      ClassAndMethod callee) {
-    MemberName calleeName = callee.name();
-    for (LocalVariableNode var :
-        variablesAtIndexes(NULL_IMPLIES_TRUE_PARAMETERS.get(calleeName), arguments)) {
-      elseUpdates.set(var, NONNULL);
-    }
-    for (LocalVariableNode var :
-        variablesAtIndexes(NONNULL_IFF_TRUE_PARAMETERS.get(calleeName), arguments)) {
-      thenUpdates.set(var, NONNULL);
-      elseUpdates.set(var, NULL);
-    }
-    for (LocalVariableNode var :
-        variablesAtIndexes(NULL_IFF_TRUE_PARAMETERS.get(calleeName), arguments)) {
-      thenUpdates.set(var, NULL);
+      LocalVariableUpdates elseUpdates, List<Node> arguments, ClassAndMethod callee) {
+    Set<Integer> nullImpliesTrueParameters = NULL_IMPLIES_TRUE_PARAMETERS.get(callee.name());
+    for (LocalVariableNode var : variablesAtIndexes(nullImpliesTrueParameters, arguments)) {
       elseUpdates.set(var, NONNULL);
     }
   }
@@ -985,7 +970,6 @@ class NullnessPropagationTransfer extends AbstractNullnessPropagationTransfer
   @VisibleForTesting
   static final ImmutableSetMultimap<MemberName, Integer> REQUIRED_NON_NULL_PARAMETERS =
       new ImmutableSetMultimap.Builder<MemberName, Integer>()
-          .put(member(Objects.class, "requireNonNull"), 0)
           .put(member(Preconditions.class, "checkNotNull"), 0)
           .put(member(Verify.class, "verifyNotNull"), 0)
           .put(member("junit.framework.Assert", "assertNotNull"), -1)
@@ -1001,23 +985,5 @@ class NullnessPropagationTransfer extends AbstractNullnessPropagationTransfer
   static final ImmutableSetMultimap<MemberName, Integer> NULL_IMPLIES_TRUE_PARAMETERS =
       new ImmutableSetMultimap.Builder<MemberName, Integer>()
           .put(member(Strings.class, "isNullOrEmpty"), 0)
-          .build();
-
-  /**
-   * Maps from non-null test methods to indices of arguments that are comapred against null. These
-   * methods must guarantee non-nullness if {@code true} <b>and nullness if {@code false}</b>.
-   */
-  private static final ImmutableSetMultimap<MemberName, Integer> NONNULL_IFF_TRUE_PARAMETERS =
-      new ImmutableSetMultimap.Builder<MemberName, Integer>()
-          .put(member(Objects.class, "nonNull"), 0)
-          .build();
-
-  /**
-   * Maps from null test methods to indices of arguments that are comapred against null. These
-   * methods must guarantee nullness if {@code true} <b>and non-nullness if {@code false}</b>.
-   */
-  private static final ImmutableSetMultimap<MemberName, Integer> NULL_IFF_TRUE_PARAMETERS =
-      new ImmutableSetMultimap.Builder<MemberName, Integer>()
-          .put(member(Objects.class, "isNull"), 0)
           .build();
 }

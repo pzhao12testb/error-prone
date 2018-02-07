@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 The Error Prone Authors.
+ * Copyright 2017 Google Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,7 +45,7 @@ public class StringSplitterTest {
             "import com.google.common.base.Splitter;",
             "class Test {",
             "  void f() {",
-            "    for (String s : Splitter.on(':').split(\"\")) {}",
+            "    for (String s : Splitter.on(\":\").split(\"\")) {}",
             "  }",
             "}")
         .doTest(TestMode.TEXT_MATCH);
@@ -67,7 +67,7 @@ public class StringSplitterTest {
             "import com.google.common.base.Splitter;",
             "class Test {",
             "  void f() {",
-            "    Iterable<String> pieces = Splitter.on(':').split(\"\");",
+            "    Iterable<String> pieces = Splitter.on(\":\").split(\"\");",
             "    for (String s : pieces) {}",
             "  }",
             "}")
@@ -91,7 +91,7 @@ public class StringSplitterTest {
             "import java.util.List;",
             "class Test {",
             "  void f() {",
-            "    List<String> pieces = Splitter.on(':').splitToList(\"\");",
+            "    List<String> pieces = Splitter.on(\":\").splitToList(\"\");",
             "    for (int i = 0; i < pieces.size(); i++) {}",
             "  }",
             "}")
@@ -116,7 +116,7 @@ public class StringSplitterTest {
             "import java.util.List;",
             "class Test {",
             "  void f() {",
-            "    List<String> pieces = Splitter.on(':').splitToList(\"\");",
+            "    List<String> pieces = Splitter.on(\":\").splitToList(\"\");",
             "    System.err.println(pieces.get(0));",
             "    System.err.println(pieces.get(1));",
             "  }",
@@ -131,7 +131,7 @@ public class StringSplitterTest {
             "in/Test.java",
             "class Test {",
             "  void f() {",
-            "    for (String s : \"\".split(\".*foo\\\\t\")) {}",
+            "    for (String s : \"\".split(\".*foo\")) {}",
             "  }",
             "}")
         .addOutputLines(
@@ -139,30 +139,7 @@ public class StringSplitterTest {
             "import com.google.common.base.Splitter;",
             "class Test {",
             "  void f() {",
-            "    for (String s : Splitter.onPattern(\".*foo\\\\t\").split(\"\")) {}",
-            "  }",
-            "}")
-        .doTest(TestMode.TEXT_MATCH);
-  }
-
-  @Test
-  public void character() throws IOException {
-    testHelper
-        .addInputLines(
-            "in/Test.java",
-            "class Test {",
-            "  void f() {",
-            "    for (String s : \"\".split(\"c\")) {}",
-            "    for (String s : \"\".split(\"abc\")) {}",
-            "  }",
-            "}")
-        .addOutputLines(
-            "out/Test.java",
-            "import com.google.common.base.Splitter;",
-            "class Test {",
-            "  void f() {",
-            "    for (String s : Splitter.on('c').split(\"\")) {}",
-            "    for (String s : Splitter.on(\"abc\").split(\"\")) {}",
+            "    for (String s : Splitter.onPattern(\".*foo\").split(\"\")) {}",
             "  }",
             "}")
         .doTest(TestMode.TEXT_MATCH);
@@ -177,103 +154,6 @@ public class StringSplitterTest {
             "  void f() {",
             "    String[] pieces = \"\".split(\":\");",
             "    System.err.println(pieces);", // escapes
-            "  }",
-            "}")
-        .doTest();
-  }
-
-  @Test
-  public void mutation() throws IOException {
-    testHelper
-        .addInputLines(
-            "in/Test.java",
-            "class Test {",
-            "  void f() {",
-            "    String[] xs = \"\".split(\"c\");",
-            "    xs[0] = null;",
-            "    System.err.println(xs[0]);",
-            "  }",
-            "}")
-        .addOutputLines(
-            "out/Test.java",
-            "import com.google.common.base.Splitter;",
-            "import java.util.ArrayList;",
-            "import java.util.List;",
-            "class Test {",
-            "  void f() {",
-            "    List<String> xs = new ArrayList<>(Splitter.on('c').splitToList(\"\"));",
-            "    xs.set(0, null);",
-            "    System.err.println(xs.get(0));",
-            "  }",
-            "}")
-        .doTest(TestMode.TEXT_MATCH);
-  }
-
-  // regression test for b/72088500
-  @Test
-  public void b72088500() throws IOException {
-    testHelper
-        .addInputLines(
-            "in/Test.java",
-            "class Test {",
-            "  void f(String input) {",
-            "    String[] lines = input.split(\"\\\\r?\\\\n\");",
-            "    System.err.println(lines[0]);",
-            "  }",
-            "}")
-        .addOutputLines(
-            "out/Test.java",
-            "import com.google.common.base.Splitter;",
-            "import java.util.List;",
-            "class Test {",
-            "  void f(String input) {",
-            "    List<String> lines = Splitter.onPattern(\"\\\\r?\\\\n\").splitToList(input);",
-            "    System.err.println(lines.get(0));",
-            "  }",
-            "}")
-        .doTest();
-  }
-
-  @Test
-  public void escape() throws IOException {
-    testHelper
-        .addInputLines(
-            "in/Test.java",
-            "class Test {",
-            "  void f() {",
-            "    String[] pieces = \"\".split(\"\\n\\t\\r\\f\");",
-            "  }",
-            "}")
-        .addOutputLines(
-            "out/Test.java",
-            "import com.google.common.base.Splitter;",
-            "class Test {",
-            "  void f() {",
-            "    Iterable<String> pieces = Splitter.on(\"\\n\\t\\r\\f\").split(\"\");",
-            "  }",
-            "}")
-        .doTest();
-  }
-
-  @Test
-  public void immediateArrayAccess() throws IOException {
-    testHelper
-        .addInputLines(
-            "in/Test.java",
-            "class Test {",
-            "  void f() {",
-            "    String x = \"\".split(\"c\")[0];",
-            "    x = \"\".split(\"c\")[1];",
-            "  }",
-            "}")
-        .addOutputLines(
-            "out/Test.java",
-            "import com.google.common.base.Splitter;",
-            "import com.google.common.collect.Iterables;",
-            "class Test {",
-            "  void f() {",
-            "    String x = Iterables.get(Splitter.on('c').split(\"\"), 0);",
-            "    x = Iterables.get(Splitter.on('c').split(\"\"), 1);",
             "  }",
             "}")
         .doTest();

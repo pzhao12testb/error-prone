@@ -60,7 +60,6 @@ import com.sun.tools.javac.code.Symbol.VarSymbol;
 import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.code.TypeTag;
 import com.sun.tools.javac.tree.JCTree;
-import com.sun.tools.javac.tree.JCTree.JCCompilationUnit;
 import com.sun.tools.javac.tree.JCTree.JCExpression;
 import com.sun.tools.javac.tree.JCTree.JCFieldAccess;
 import com.sun.tools.javac.tree.JCTree.JCIdent;
@@ -1431,46 +1430,4 @@ public class Matchers {
     };
   }
 
-  /**
-   * Matches any node that is directly an implementation, but not extension, of the given Class.
-   *
-   * <p>E.x. {@code class C implements I} will match, but {@code class C extends A} will not.
-   *
-   * <p>Additionally, this will only match <i>direct</i> implementations of interfaces. E.g. the
-   * following will not match:
-   *
-   * <p>{@code interface I1 {} interface I2 extends I1 {} class C implements I2 {} ...
-   * isDirectImplementationOf(I1).match(\/*class tree for C*\/); // will not match }
-   */
-  public static Matcher<ClassTree> isDirectImplementationOf(String clazz) {
-    Matcher<Tree> isProvidedType = isSameType(clazz);
-    return new IsDirectImplementationOf(isProvidedType);
-  }
-
-  private static class IsDirectImplementationOf extends ChildMultiMatcher<ClassTree, Tree> {
-    public IsDirectImplementationOf(Matcher<Tree> classMatcher) {
-      super(MatchType.AT_LEAST_ONE, classMatcher);
-    }
-
-    @Override
-    protected Iterable<? extends Tree> getChildNodes(ClassTree classTree, VisitorState state) {
-      return classTree.getImplementsClause();
-    }
-  }
-
-
-  /** Matches an AST node whose compilation unit's package name matches the given pattern. */
-  public static <T extends Tree> Matcher<T> packageMatches(Pattern pattern) {
-    return (tree, state) -> pattern.matcher(getPackageFullName(state)).matches();
-  }
-
-  /** Matches an AST node whose compilation unit starts with this prefix. */
-  public static <T extends Tree> Matcher<T> packageStartsWith(String prefix) {
-    return (tree, state) -> getPackageFullName(state).startsWith(prefix);
-  }
-
-  private static String getPackageFullName(VisitorState state) {
-    JCCompilationUnit compilationUnit = (JCCompilationUnit) state.getPath().getCompilationUnit();
-    return compilationUnit.packge.fullname.toString();
-  }
 }

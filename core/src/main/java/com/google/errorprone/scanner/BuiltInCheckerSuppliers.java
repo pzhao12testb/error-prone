@@ -39,7 +39,6 @@ import com.google.errorprone.bugpatterns.BoxedPrimitiveConstructor;
 import com.google.errorprone.bugpatterns.BugChecker;
 import com.google.errorprone.bugpatterns.CannotMockFinalClass;
 import com.google.errorprone.bugpatterns.CanonicalDuration;
-import com.google.errorprone.bugpatterns.CatchAndPrintStackTrace;
 import com.google.errorprone.bugpatterns.CatchFail;
 import com.google.errorprone.bugpatterns.ChainingConstructorIgnoresParameter;
 import com.google.errorprone.bugpatterns.CheckReturnValue;
@@ -54,7 +53,6 @@ import com.google.errorprone.bugpatterns.ComparisonContractViolated;
 import com.google.errorprone.bugpatterns.ComparisonOutOfRange;
 import com.google.errorprone.bugpatterns.CompileTimeConstantChecker;
 import com.google.errorprone.bugpatterns.ComplexBooleanConstant;
-import com.google.errorprone.bugpatterns.ConditionalExpressionNumericPromotion;
 import com.google.errorprone.bugpatterns.ConstantField;
 import com.google.errorprone.bugpatterns.ConstantOverflow;
 import com.google.errorprone.bugpatterns.ConstructorInvokesOverridable;
@@ -66,7 +64,6 @@ import com.google.errorprone.bugpatterns.DefaultCharset;
 import com.google.errorprone.bugpatterns.DepAnn;
 import com.google.errorprone.bugpatterns.DivZero;
 import com.google.errorprone.bugpatterns.DoNotCallChecker;
-import com.google.errorprone.bugpatterns.DoubleBraceInitialization;
 import com.google.errorprone.bugpatterns.EmptyIfStatement;
 import com.google.errorprone.bugpatterns.EmptyTopLevelDeclaration;
 import com.google.errorprone.bugpatterns.EqualsHashCode;
@@ -159,7 +156,6 @@ import com.google.errorprone.bugpatterns.NumericEquality;
 import com.google.errorprone.bugpatterns.OperatorPrecedence;
 import com.google.errorprone.bugpatterns.OptionalEquality;
 import com.google.errorprone.bugpatterns.OptionalNotPresent;
-import com.google.errorprone.bugpatterns.OrphanedFormatString;
 import com.google.errorprone.bugpatterns.OverrideThrowableToString;
 import com.google.errorprone.bugpatterns.Overrides;
 import com.google.errorprone.bugpatterns.PackageInfo;
@@ -228,7 +224,6 @@ import com.google.errorprone.bugpatterns.UnusedAnonymousClass;
 import com.google.errorprone.bugpatterns.UnusedCollectionModifiedInPlace;
 import com.google.errorprone.bugpatterns.UseCorrectAssertInTests;
 import com.google.errorprone.bugpatterns.VarChecker;
-import com.google.errorprone.bugpatterns.VarTypeName;
 import com.google.errorprone.bugpatterns.WaitNotInLoop;
 import com.google.errorprone.bugpatterns.WildcardImport;
 import com.google.errorprone.bugpatterns.WrongParameterPackage;
@@ -246,6 +241,7 @@ import com.google.errorprone.bugpatterns.android.WakelockReleasedDangerously;
 import com.google.errorprone.bugpatterns.argumentselectiondefects.ArgumentSelectionDefectChecker;
 import com.google.errorprone.bugpatterns.argumentselectiondefects.AssertEqualsArgumentOrderChecker;
 import com.google.errorprone.bugpatterns.argumentselectiondefects.AutoValueConstructorOrderChecker;
+import com.google.errorprone.bugpatterns.argumentselectiondefects.NamedParameterChecker;
 import com.google.errorprone.bugpatterns.collectionincompatibletype.CollectionIncompatibleType;
 import com.google.errorprone.bugpatterns.collectionincompatibletype.CompatibleWithMisuse;
 import com.google.errorprone.bugpatterns.collectionincompatibletype.IncompatibleArgumentType;
@@ -271,7 +267,6 @@ import com.google.errorprone.bugpatterns.inject.dagger.AndroidInjectionBeforeSup
 import com.google.errorprone.bugpatterns.inject.dagger.EmptySetMultibindingContributions;
 import com.google.errorprone.bugpatterns.inject.dagger.PrivateConstructorForNoninstantiableModule;
 import com.google.errorprone.bugpatterns.inject.dagger.ProvidesNull;
-import com.google.errorprone.bugpatterns.inject.dagger.ScopeOnModule;
 import com.google.errorprone.bugpatterns.inject.dagger.UseBinds;
 import com.google.errorprone.bugpatterns.inject.guice.AssistedInjectScoping;
 import com.google.errorprone.bugpatterns.inject.guice.AssistedParameters;
@@ -360,7 +355,6 @@ public class BuiltInCheckerSuppliers {
           ComparisonOutOfRange.class,
           CompileTimeConstantChecker.class,
           ComplexBooleanConstant.class,
-          ConditionalExpressionNumericPromotion.class,
           ConstantOverflow.class,
           DeadException.class,
           DeadThread.class,
@@ -433,6 +427,7 @@ public class BuiltInCheckerSuppliers {
           SelfEquals.class,
           SizeGreaterThanOrEqualsZero.class,
           ShouldHaveEvenArgs.class,
+          StreamResourceLeak.class,
           StreamToString.class,
           StringBuilderInitWithChar.class,
           SuppressWarningsDeprecated.class,
@@ -443,8 +438,7 @@ public class BuiltInCheckerSuppliers {
           TypeParameterQualifier.class,
           UnnecessaryTypeArgument.class,
           UnusedAnonymousClass.class,
-          UnusedCollectionModifiedInPlace.class,
-          VarTypeName.class);
+          UnusedCollectionModifiedInPlace.class);
 
   /** A list of all checks with severity WARNING that are on by default. */
   public static final ImmutableSet<BugCheckerInfo> ENABLED_WARNINGS =
@@ -458,16 +452,13 @@ public class BuiltInCheckerSuppliers {
           BoxedPrimitiveConstructor.class,
           CannotMockFinalClass.class,
           CanonicalDuration.class,
-          CatchAndPrintStackTrace.class,
           CatchFail.class,
           ClassCanBeStatic.class,
           ClassNewInstance.class,
           CollectionToArraySafeParameter.class,
           CollectorShouldNotUseState.class,
           ComparableAndComparator.class,
-          DateFormatConstant.class,
           DefaultCharset.class,
-          DoubleBraceInitialization.class,
           DoubleCheckedLocking.class,
           EqualsHashCode.class,
           EqualsIncompatibleType.class,
@@ -501,6 +492,7 @@ public class BuiltInCheckerSuppliers {
           ModifyCollectionInEnhancedForLoop.class,
           MultipleParallelOrSequentialCalls.class,
           MutableConstantField.class,
+          NamedParameterChecker.class,
           NarrowingCompoundAssignment.class,
           NestedInstanceOfConditions.class,
           NonAtomicVolatileUpdate.class,
@@ -510,21 +502,19 @@ public class BuiltInCheckerSuppliers {
           NullableVoid.class,
           OperatorPrecedence.class,
           OptionalNotPresent.class,
-          OrphanedFormatString.class,
           Overrides.class,
           OverridesGuiceInjectableMethod.class,
           OverrideThrowableToString.class,
           ParameterName.class,
           PreconditionsInvalidPlaceholder.class,
           ProtoFieldPreconditionsCheckNotNull.class,
-          QualifierOrScopeOnInjectMethod.class,
           ReachabilityFenceUsage.class,
           ReferenceEquality.class,
           RequiredModifiersChecker.class,
           ShortCircuitBoolean.class,
           StringSplitter.class,
+          DateFormatConstant.class,
           StaticGuardedByInstance.class,
-          StreamResourceLeak.class,
           SynchronizeOnNonFinalField.class,
           ThreadJoinLoop.class,
           ThreadLocalUsage.class,
@@ -594,13 +584,13 @@ public class BuiltInCheckerSuppliers {
           PrivateConstructorForNoninstantiableModule.class,
           ProtoStringFieldReferenceEquality.class,
           ProvidesFixChecker.class,
+          QualifierOrScopeOnInjectMethod.class,
           QualifierWithTypeUse.class,
           RedundantThrows.class,
           RemoveUnusedImports.class,
           RestrictToEnforcer.class,
           ReturnMissingNullable.class,
           ScopeAnnotationOnInterfaceOrAbstractClass.class,
-          ScopeOnModule.class,
           ScopeOrQualifierAnnotationRetention.class,
           StaticQualifiedUsingExpression.class,
           StaticOrDefaultInterfaceMethod.class,

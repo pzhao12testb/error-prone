@@ -76,11 +76,7 @@ public class ModifyCollectionInEnhancedForLoop extends BugChecker
     if (blockEndsInBreakOrReturn(state)) {
       return NO_MATCH;
     }
-    ExpressionTree collection = getReceiver(tree);
-    if (collection == null) {
-      return NO_MATCH;
-    }
-    if (!enclosingLoop(state.getPath(), collection)) {
+    if (!enclosingLoop(state.getPath(), getReceiver(tree))) {
       return NO_MATCH;
     }
     return describeMatch(tree);

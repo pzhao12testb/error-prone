@@ -16,10 +16,8 @@
 
 package com.google.errorprone.bugpatterns.threadsafety;
 
-import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
-import static com.google.errorprone.matchers.Description.NO_MATCH;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableSet;
@@ -31,11 +29,6 @@ import com.google.errorprone.ErrorProneFlags;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.annotations.Immutable;
 import com.google.errorprone.bugpatterns.BugChecker;
-import com.google.errorprone.bugpatterns.BugChecker.ClassTreeMatcher;
-import com.google.errorprone.bugpatterns.BugChecker.MemberReferenceTreeMatcher;
-import com.google.errorprone.bugpatterns.BugChecker.MethodInvocationTreeMatcher;
-import com.google.errorprone.bugpatterns.BugChecker.NewClassTreeMatcher;
-import com.google.errorprone.bugpatterns.BugChecker.TypeParameterTreeMatcher;
 import com.google.errorprone.bugpatterns.threadsafety.ImmutableAnalysis.ViolationReporter;
 import com.google.errorprone.bugpatterns.threadsafety.ThreadSafety.Violation;
 import com.google.errorprone.fixes.Fix;
@@ -44,21 +37,15 @@ import com.google.errorprone.matchers.Description;
 import com.google.errorprone.matchers.Description.Builder;
 import com.google.errorprone.util.ASTHelpers;
 import com.sun.source.tree.ClassTree;
-import com.sun.source.tree.MemberReferenceTree;
-import com.sun.source.tree.MethodInvocationTree;
-import com.sun.source.tree.NewClassTree;
 import com.sun.source.tree.Tree;
 import com.sun.source.tree.TypeParameterTree;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Symbol.ClassSymbol;
 import com.sun.tools.javac.code.Symbol.TypeVariableSymbol;
 import com.sun.tools.javac.code.Type;
-import com.sun.tools.javac.tree.JCTree.JCMemberReference;
-import com.sun.tools.javac.tree.JCTree.JCNewClass;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Map.Entry;
+import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
 
 /** @author cushon@google.com (Liam Miller-Cushon) */
 @BugPattern(
@@ -69,12 +56,7 @@ import java.util.Optional;
   documentSuppression = false,
   providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION
 )
-public class ImmutableChecker extends BugChecker
-    implements ClassTreeMatcher,
-        NewClassTreeMatcher,
-        TypeParameterTreeMatcher,
-        MethodInvocationTreeMatcher,
-        MemberReferenceTreeMatcher {
+public class ImmutableChecker extends BugChecker implements BugChecker.ClassTreeMatcher {
 
   private final WellKnownMutability wellKnownMutability;
 
@@ -85,72 +67,6 @@ public class ImmutableChecker extends BugChecker
 
   public ImmutableChecker(ErrorProneFlags flags) {
     this.wellKnownMutability = WellKnownMutability.fromFlags(flags);
-  }
-
-  // check instantiations of `@ImmutableTypeParameter`s in method references
-  @Override
-  public Description matchMemberReference(MemberReferenceTree tree, VisitorState state) {
-    return checkInvocation(
-        tree, ((JCMemberReference) tree).referentType, state, ASTHelpers.getSymbol(tree));
-  }
-
-  // check instantiations of `@ImmutableTypeParameter`s in method invocations
-  @Override
-  public Description matchMethodInvocation(MethodInvocationTree tree, VisitorState state) {
-    return checkInvocation(
-        tree, ASTHelpers.getType(tree.getMethodSelect()), state, ASTHelpers.getSymbol(tree));
-  }
-
-  @Override
-  public Description matchNewClass(NewClassTree tree, VisitorState state) {
-    // check instantiations of `@ImmutableTypeParameter`s in generic constructor invocations
-    checkInvocation(
-        tree, ((JCNewClass) tree).constructorType, state, ((JCNewClass) tree).constructor);
-    // check instantiations of `@ImmutableTypeParameter`s in class constructor invocations
-    ImmutableAnalysis analysis = new ImmutableAnalysis(this, state, wellKnownMutability);
-    Violation info =
-        analysis.checkInstantiation(
-            ASTHelpers.getSymbol(tree.getIdentifier()).getTypeParameters(),
-            ASTHelpers.getType(tree).getTypeArguments());
-    if (info.isPresent()) {
-      state.reportMatch(buildDescription(tree).setMessage(info.message()).build());
-    }
-    return NO_MATCH;
-  }
-
-  private Description checkInvocation(
-      Tree tree, Type methodType, VisitorState state, Symbol symbol) {
-    ImmutableAnalysis analysis = new ImmutableAnalysis(this, state, wellKnownMutability);
-    Violation info = analysis.checkInvocation(methodType, symbol);
-    if (info.isPresent()) {
-      state.reportMatch(buildDescription(tree).setMessage(info.message()).build());
-    }
-    return NO_MATCH;
-  }
-
-  @Override
-  public Description matchTypeParameter(TypeParameterTree tree, VisitorState state) {
-    Symbol sym = ASTHelpers.getSymbol(tree);
-    if (sym == null) {
-      return NO_MATCH;
-    }
-    ImmutableAnalysis analysis = new ImmutableAnalysis(this, state, wellKnownMutability);
-    if (!analysis.isImmutableTypeParameter((TypeVariableSymbol) sym)) {
-      return NO_MATCH;
-    }
-    switch (sym.owner.getKind()) {
-      case METHOD:
-      case CONSTRUCTOR:
-        return NO_MATCH;
-      default: // fall out
-    }
-    AnnotationInfo info = analysis.getImmutableAnnotation(sym.owner, state);
-    if (info == null) {
-      return buildDescription(tree)
-          .setMessage("@Immutable is only supported on immutable classes")
-          .build();
-    }
-    return NO_MATCH;
   }
 
   @Override
@@ -172,41 +88,21 @@ public class ImmutableChecker extends BugChecker
     // Special-case visiting declarations of known-immutable types; these uses
     // of the annotation are "trusted".
     if (wellKnownMutability.getKnownImmutableClasses().containsValue(annotation)) {
-      return NO_MATCH;
+      return Description.NO_MATCH;
     }
 
     // Check that the types in containerOf actually exist
-    Map<String, TypeVariableSymbol> typarams = new HashMap<>();
+    Set<String> typarams = new HashSet<>();
     for (TypeParameterTree typaram : tree.getTypeParameters()) {
-      typarams.put(
-          typaram.getName().toString(), (TypeVariableSymbol) ASTHelpers.getSymbol(typaram));
+      typarams.add(typaram.getName().toString());
     }
-    SetView<String> difference = Sets.difference(annotation.containerOf(), typarams.keySet());
+    SetView<String> difference = Sets.difference(annotation.containerOf(), typarams);
     if (!difference.isEmpty()) {
-      return buildDescription(tree)
-          .setMessage(
-              String.format(
-                  "could not find type(s) referenced by containerOf: %s",
-                  Joiner.on("', '").join(difference)))
-          .build();
-    }
-    ImmutableSet<String> immutableAndContainer =
-        typarams
-            .entrySet()
-            .stream()
-            .filter(
-                e ->
-                    annotation.containerOf().contains(e.getKey())
-                        && analysis.isImmutableTypeParameter(e.getValue()))
-            .map(Entry::getKey)
-            .collect(toImmutableSet());
-    if (!immutableAndContainer.isEmpty()) {
-      return buildDescription(tree)
-          .setMessage(
-              String.format(
-                  "using both @ImmutableTypeParameter and containerOf is redundant: %s",
-                  Joiner.on("', '").join(immutableAndContainer)))
-          .build();
+      String message =
+          String.format(
+              "could not find type(s) referenced by containerOf: %s",
+              Joiner.on("', '").join(difference));
+      return buildDescription(tree).setMessage(message).build();
     }
 
     // Main path for @Immutable-annotated types:
@@ -225,7 +121,7 @@ public class ImmutableChecker extends BugChecker
                 describeClass(matched, sym, annotation, violation));
 
     if (!info.isPresent()) {
-      return NO_MATCH;
+      return Description.NO_MATCH;
     }
 
     return describeClass(tree, sym, annotation, info).build();
@@ -252,11 +148,11 @@ public class ImmutableChecker extends BugChecker
       ClassTree tree, VisitorState state, ImmutableAnalysis analysis) {
     ClassSymbol sym = ASTHelpers.getSymbol(tree);
     if (sym == null) {
-      return NO_MATCH;
+      return Description.NO_MATCH;
     }
     Type superType = immutableSupertype(sym, state);
     if (superType == null) {
-      return NO_MATCH;
+      return Description.NO_MATCH;
     }
     // We don't need to check that the superclass has an immutable instantiation.
     // The anonymous instance can only be referred to using a superclass type, so
@@ -281,7 +177,7 @@ public class ImmutableChecker extends BugChecker
               }
             });
     if (!info.isPresent()) {
-      return NO_MATCH;
+      return Description.NO_MATCH;
     }
     return describeAnonymous(tree, superType, info).build();
   }
@@ -300,11 +196,11 @@ public class ImmutableChecker extends BugChecker
   private Description checkSubtype(ClassTree tree, VisitorState state) {
     ClassSymbol sym = ASTHelpers.getSymbol(tree);
     if (sym == null) {
-      return NO_MATCH;
+      return Description.NO_MATCH;
     }
     Type superType = immutableSupertype(sym, state);
     if (superType == null) {
-      return NO_MATCH;
+      return Description.NO_MATCH;
     }
     String message =
         String.format(

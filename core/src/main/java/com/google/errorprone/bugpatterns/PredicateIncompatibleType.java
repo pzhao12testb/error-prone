@@ -48,8 +48,7 @@ public class PredicateIncompatibleType extends BugChecker implements MemberRefer
     }
     Type predicateType = predicateType(ASTHelpers.getType(tree), state);
     Type receiverType = getReceiverType(tree);
-    if (EqualsIncompatibleType.compatibilityOfTypes(receiverType, predicateType, state)
-        .compatible()) {
+    if (!EqualsIncompatibleType.incompatibleTypes(receiverType, predicateType, state)) {
       return NO_MATCH;
     }
     return buildDescription(tree)

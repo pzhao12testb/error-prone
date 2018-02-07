@@ -25,7 +25,9 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
+import com.google.common.collect.Streams;
 import com.google.errorprone.VisitorState;
+import com.google.errorprone.annotations.ImmutableTypeParameter;
 import com.google.errorprone.bugpatterns.CanBeStaticAnalyzer;
 import com.google.errorprone.util.ASTHelpers;
 import com.sun.source.tree.ClassTree;
@@ -224,6 +226,14 @@ public final class ThreadSafety {
       if (threadSafeTypeParams.contains(tyvar.getSimpleName().toString())) {
         return Violation.absent();
       }
+      Symbol immutableTypeParameter =
+          state.getSymbolFromString(ImmutableTypeParameter.class.getName());
+      if (tyvar
+          .getAnnotationMirrors()
+          .stream()
+          .anyMatch(t -> t.getAnnotationType().asElement().equals(immutableTypeParameter))) {
+        return Violation.absent();
+      }
       String message;
       if (threadSafeTypeParams.isEmpty()) {
         message = String.format("'%s' is a mutable type variable", tyvar.getSimpleName());
@@ -277,7 +287,9 @@ public final class ThreadSafety {
           String.format(
               "the declaration of type '%s' is not annotated with %s",
               type,
-              markerAnnotations.stream().map(a -> "@" + a).collect(Collectors.joining(" or "))));
+              Streams.concat(markerAnnotations.stream(), acceptedAnnotations.stream())
+                  .map(a -> "@" + a)
+                  .collect(Collectors.joining(" or "))));
     }
   }
 
@@ -290,9 +302,6 @@ public final class ThreadSafety {
     AnnotationInfo known = knownTypes.getKnownSafeClasses().get(nameStr);
     if (known != null) {
       return known;
-    }
-    if (!(sym instanceof ClassSymbol)) {
-      return null;
     }
     return getAnnotation(
         sym, ImmutableSet.copyOf(Sets.union(markerAnnotations, acceptedAnnotations)), state);
@@ -376,9 +385,17 @@ public final class ThreadSafety {
       VisitorState state,
       String annotation,
       @Nullable Class<? extends Annotation> elementAnnotation) {
-    Compound attr = sym.attribute(state.getSymbolFromString(annotation));
-    if (attr != null) {
-      ImmutableList<String> containerElements = containerOf(state, attr);
+    if (sym == null) {
+      return null;
+    }
+    Symbol annosym = state.getSymbolFromString(annotation);
+    Optional<Compound> attr =
+        sym.getAnnotationMirrors()
+            .stream()
+            .filter(a -> a.getAnnotationType().asElement().equals(annosym))
+            .findAny();
+    if (attr.isPresent()) {
+      ImmutableList<String> containerElements = containerOf(state, attr.get());
       if (elementAnnotation != null && containerElements.isEmpty()) {
         containerElements =
             sym.getTypeParameters()
@@ -390,6 +407,9 @@ public final class ThreadSafety {
       return AnnotationInfo.create(sym.getQualifiedName().toString(), containerElements);
     }
     // @ThreadSafe is inherited from supertypes
+    if (!(sym instanceof ClassSymbol)) {
+      return null;
+    }
     Type superClass = ((ClassSymbol) sym).getSuperclass();
     AnnotationInfo superAnnotation = getInheritedAnnotation(superClass.asElement(), state);
     if (superAnnotation == null) {
@@ -422,9 +442,6 @@ public final class ThreadSafety {
    * containerOf spec's from super-classes.
    */
   public AnnotationInfo getInheritedAnnotation(Symbol sym, VisitorState state) {
-    if (!(sym instanceof ClassSymbol)) {
-      return null;
-    }
     return getAnnotation(sym, markerAnnotations, state);
   }
 

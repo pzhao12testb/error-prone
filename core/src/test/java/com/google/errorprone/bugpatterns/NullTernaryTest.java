@@ -78,4 +78,33 @@ public class NullTernaryTest {
             "}")
         .doTest();
   }
+
+  @Test
+  public void lambdas() throws IOException {
+    testHelper
+        .addSourceLines(
+            "Test.java",
+            "class Test {",
+            "  interface I {",
+            "    int f();",
+            "  }",
+            "  interface J {",
+            "    Integer f();",
+            "  }",
+            "  interface K<X> {",
+            "    X f();",
+            "  }",
+            "  void f(boolean b) {",
+            "    // BUG: Diagnostic contains:",
+            "    I i = () -> { return b ? null : 1; };",
+            "    J j = () -> { return b ? null : 1; };",
+            "    K<Integer> k = () -> { return b ? null : 1; };",
+            "    // BUG: Diagnostic contains:",
+            "    i = () -> b ? null : 1;",
+            "    j = () -> b ? null : 1;",
+            "    k = () -> b ? null : 1;",
+            "  }",
+            "}")
+        .doTest();
+  }
 }

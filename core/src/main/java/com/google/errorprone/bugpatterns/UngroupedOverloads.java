@@ -27,7 +27,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.ClassTreeMatcher;
 import com.google.errorprone.fixes.SuggestedFix;
@@ -59,8 +58,7 @@ import javax.lang.model.element.Name;
   category = JDK,
   severity = SUGGESTION,
   linkType = CUSTOM,
-  link = "https://google.github.io/styleguide/javaguide.html#s3.4.2.1-overloads-never-split",
-  providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION
+  link = "https://google.github.io/styleguide/javaguide.html#s3.4.2.1-overloads-never-split"
 )
 public class UngroupedOverloads extends BugChecker implements ClassTreeMatcher {
 
@@ -252,14 +250,14 @@ public class UngroupedOverloads extends BugChecker implements ClassTreeMatcher {
   abstract static class OverloadKey {
     abstract String name();
 
+    // TODO(cushon): re-enable this, but don't warn about interspersed static/non-static overloads
     // Include static-ness when grouping overloads. Static and non-static methods are still
     // overloads per the JLS, but are less interesting in practice.
-    abstract boolean isStatic();
+    // abstract boolean isStatic();
 
     public static OverloadKey create(MethodTree methodTree) {
       MethodSymbol sym = ASTHelpers.getSymbol(methodTree);
-      return new AutoValue_UngroupedOverloads_OverloadKey(
-          sym.getSimpleName().toString(), sym.isStatic());
+      return new AutoValue_UngroupedOverloads_OverloadKey(sym.getSimpleName().toString());
     }
   }
 

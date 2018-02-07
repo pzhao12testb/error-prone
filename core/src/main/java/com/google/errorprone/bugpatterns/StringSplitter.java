@@ -31,6 +31,7 @@ import com.google.errorprone.fixes.SuggestedFix;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.matchers.Matcher;
 import com.google.errorprone.util.ASTHelpers;
+import com.google.errorprone.util.SourceCodeEscapers;
 import com.sun.source.tree.ArrayAccessTree;
 import com.sun.source.tree.AssignmentTree;
 import com.sun.source.tree.EnhancedForLoopTree;
@@ -72,7 +73,7 @@ public class StringSplitter extends BugChecker implements MethodInvocationTreeMa
     if (value != null) {
       Optional<String> regexAsLiteral = convertRegexToLiteral(value);
       if (regexAsLiteral.isPresent()) {
-        value = regexAsLiteral.get();
+        value = SourceCodeEscapers.javaCharEscaper().escape(regexAsLiteral.get());
         if (value.length() == 1) {
           value = String.format("'%s'", value.charAt(0));
         } else {
@@ -99,6 +100,32 @@ public class StringSplitter extends BugChecker implements MethodInvocationTreeMa
                   "split",
                   maybeRegex,
                   /* mutableList= */ false)
+              .build());
+    }
+    if (parent instanceof ArrayAccessTree) {
+      ArrayAccessTree arrayAccessTree = (ArrayAccessTree) parent;
+      if (!arrayAccessTree.getExpression().equals(tree)) {
+        return NO_MATCH;
+      }
+      SuggestedFix.Builder fix =
+          SuggestedFix.builder()
+              .addImport("com.google.common.collect.Iterables")
+              .replace(
+                  ((JCTree) arrayAccessTree).getStartPosition(),
+                  ((JCTree) arrayAccessTree).getStartPosition(),
+                  "Iterables.get(")
+              .replace(
+                  state.getEndPosition(arrayAccessTree.getExpression()),
+                  ((JCTree) arrayAccessTree.getIndex()).getStartPosition(),
+                  String.format(", "))
+              .replace(
+                  state.getEndPosition(arrayAccessTree.getIndex()),
+                  state.getEndPosition(arrayAccessTree),
+                  ")");
+      return describeMatch(
+          tree,
+          replaceWithSplitter(
+                  fix, tree, value, state, "split", maybeRegex, /* mutableList= */ false)
               .build());
     }
     // If the result of split is assigned to a variable, try to fix all uses of the variable in the
